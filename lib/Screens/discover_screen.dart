@@ -1,113 +1,76 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
-import '../Widgets/GenerateSongButtonWidget.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
-
-
+import '../API/API.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'dart:math';
 
 class DiscoverScreen extends StatefulWidget {
   @override
   _DiscoverScreenState createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProviderStateMixin {
-  final _titleController = TextEditingController();
-  final _lyricsController = TextEditingController();
-  final _genreController = TextEditingController();
-  Map<String, dynamic>? _generatedSong;
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-  bool _isLoading = false;
-  late AnimationController _animationController;
-  late Animation<Offset> _slideAnimation;
+class MusicWavePainter extends CustomPainter {
+  final Color color;
+  final int waveCount;
+  final double animation;
+
+  MusicWavePainter({required this.color, this.waveCount = 5, required this.animation});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final width = size.width / (waveCount * 2);
+    final height = size.height;
+
+    for (int i = 0; i < waveCount; i++) {
+      final x = i * width * 2;
+      final amplitude = height / 2 * (0.3 + 0.7 * sin((animation + i / waveCount) * 2 * pi));
+
+      final path = Path()
+        ..moveTo(x, height / 2)
+        ..cubicTo(
+            x + width / 2, height / 2 - amplitude,
+            x + width / 2, height / 2 + amplitude,
+            x + width, height / 2
+        );
+
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _DiscoverScreenState extends State<DiscoverScreen> {
+  List<Map<String, dynamic>> _allSongs = [];
+  bool _isLoading = true;
+  AudioPlayer _audioPlayer = AudioPlayer();
+  int _currentlyPlayingIndex = -1;
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 500),
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    _fetchAllSongs();
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _lyricsController.dispose();
-    _genreController.dispose();
-    _audioPlayer.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _generateSong() async {
-    setState(() {
-      _isLoading = true;
-      _generatedSong = null;
-    });
-    _animationController.reset();
-
-    final url = Uri.parse('http://143.244.131.156:8000/createcustom');
+  Future<void> _fetchAllSongs() async {
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${await _getToken()}',
-        },
-        body: json.encode({
-          "title": _titleController.text,
-          "lyric": _lyricsController.text,
-          "genere": _genreController.text,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _generatedSong = json.decode(response.body);
-        });
-        _animationController.forward();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate song. Please try again.')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred. Please check your connection and try again.')),
-      );
-    } finally {
+      final songs = await ApiService.getAllSongs(page: _currentPage);
       setState(() {
+        _allSongs.addAll(songs);
         _isLoading = false;
       });
-    }
-  }
-
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
-  }
-
-  void _togglePlayPause() async {
-    if (_generatedSong != null) {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-      } else {
-        await _audioPlayer.play(UrlSource(_generatedSong!['song_url']));
-      }
+    } catch (e) {
+      print('Error fetching all songs: $e');
       setState(() {
-        _isPlaying = !_isPlaying;
+        _isLoading = false;
       });
     }
   }
@@ -115,164 +78,175 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF121212),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            Text(
-            'Create Your Song',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  blurRadius: 10,
-                  color: Colors.purple.withOpacity(0.5),
-                  offset: Offset(2, 2),
-                ),
-              ],
+      backgroundColor: Colors.black,
+      body: _isLoading
+          ? Center(
+        child: SpinKitWave(
+          color: Colors.purple,
+          size: 50.0,
+        ),
+      )
+          : _allSongs.isEmpty
+          ? Center(
+        child: Text(
+          'No songs available',
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
+      )
+          : GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.75,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: _allSongs.length,
+        padding: EdgeInsets.all(16),
+        itemBuilder: (context, index) {
+          final song = _allSongs[index];
+          return _buildSongCard(song, index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSongCard(Map<String, dynamic> song, int index) {
+    bool isPlaying = _currentlyPlayingIndex == index;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isPlaying ? Colors.purple : Colors.grey,
+          width:isPlaying ? 2 : 1,
+        ),
+      ),
+      child: Card(
+        color: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
+                    child: Image.network(
+                      song['image_url'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey,
+                          child: Icon(Icons.music_note, color: Colors.white, size: 50),
+                        );
+                      },
+                    ),
+                  ),
+                  if (isPlaying)
+                    Positioned.fill(
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: 1),
+                        duration: Duration(seconds: 7),
+                        builder: (context, value, child) {
+                          return CustomPaint(
+                            painter: MusicWavePainter(
+                              color: Colors.white.withOpacity(0.7),
+                              animation: value,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black.withOpacity(0.5),
+                      child: IconButton(
+                        icon: Icon(
+                          isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          _togglePlayPause(song['song_url'], index);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-              SizedBox(height: 20),
-              TextField(
-                controller: _titleController,
-                  style: GoogleFonts.poppins(color: Colors.white),
-                  decoration: InputDecoration(
-                      labelText: 'Song Title',
-                      labelStyle: GoogleFonts.poppins(color: Colors.purple[200]),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.purple[700]!, width: 1.0),
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.purple[400]!, width: 2.0),
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[900],
-                      contentPadding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-              )
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _lyricsController,
-                style: GoogleFonts.poppins(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Song Lyrics',
-                  labelStyle: GoogleFonts.poppins(color: Colors.purple[200]),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.purple[700]!, width: 1.0),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.purple[400]!, width: 2.0),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[900],
-                  contentPadding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-                ),
-                maxLines: 3,
-              ),
-              SizedBox(height: 16),
-              TextField(
-                  controller: _genreController,
-                  style: GoogleFonts.poppins(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Song Genre',
-                    labelStyle: GoogleFonts.poppins(color: Colors.purple[200]),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.purple[700]!, width: 1.0),
-                      borderRadius: BorderRadius.circular(8.0),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    song['song_name'],
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.purple[400]!, width: 2.0),
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[900],
-                    contentPadding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              SizedBox(height: 24),
-              // ... (rest of the build method)
-
-              AnimatedGradientButton(
-                isLoading: _isLoading,
-                onPressed: _generateSong,
-              ),
-
-// ... (rest of the build method),
-              SizedBox(height: 24),
-              if (_isLoading)
-                Center(
-                  child: SpinKitWave(
-                    color: Theme.of(context).primaryColor,
-                    size: 50.0,
-                  ),
-                )
-              else if (_generatedSong != null)
-                SlideTransition(
-                  position: _slideAnimation,
-                  child: Card(
-                    elevation: 5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
                         children: [
+                          Icon(Icons.favorite, color: Colors.red, size: 16),
+                          SizedBox(width: 4),
                           Text(
-                            _generatedSong!['song_name'],
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 8),
-                          Text('Genre: ${_generatedSong!['tags'].join(', ')}'),
-                          SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.favorite, color: Colors.red),
-                              Text(' ${_generatedSong!['likes']}'),
-                              SizedBox(width: 16),
-                              Icon(Icons.remove_red_eye, color: Colors.blue),
-                              Text(' ${_generatedSong!['views']}'),
-                            ],
-                          ),
-                          SizedBox(height: 16),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              _generatedSong!['image_url'],
-                              height: 200,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                          Center(
-                            child: IconButton(
-                              icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                              onPressed: _togglePlayPause,
-                              iconSize: 64,
-                              color: Theme.of(context).primaryColor,
-                            ),
+                            '${song['likes']}',
+                            style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12),
                           ),
                         ],
                       ),
-                    ),
+                      Row(
+                        children: [
+                          Icon(Icons.remove_red_eye, color: Colors.grey[400], size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            '${song['views']}',
+                            style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
+  void _togglePlayPause(String url, int index) async {
+    if (_currentlyPlayingIndex == index) {
+      await _audioPlayer.pause();
+      setState(() {
+        _currentlyPlayingIndex = -1;
+      });
+    } else {
+      if (_currentlyPlayingIndex != -1) {
+        await _audioPlayer.stop();
+      }
+      await _audioPlayer.play(UrlSource(url));
+      setState(() {
+        _currentlyPlayingIndex = index;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+}

@@ -128,4 +128,25 @@ class ApiService {
     }
   }
 
+
+  //GETALLSONGS
+  static Future<List<Map<String, dynamic>>> getAllSongs({int page = 1}) async {
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/allsongs?page=$page'),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> songs = data['songs'];
+        return songs.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Failed to get all songs: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching all songs: $e');
+    }
+  }
+
 }

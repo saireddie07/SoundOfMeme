@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'log_in_screen.dart';
 import '../API/API.dart';
 
@@ -14,13 +15,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   String email = '';
   String profileUrl = '';
   bool isLoading = true;
+  String? _token;
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    fetchUserDetails();
+    checkLoginStatus();
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 500),
@@ -38,6 +40,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> checkLoginStatus() async {
+    bool isLoggedIn = await ApiService.isLoggedIn();
+    if (isLoggedIn) {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('auth_token');
+      fetchUserDetails();
+    } else {
+      setState(() {
+        isLoading = false;
+        _token = null;
+      });
+    }
   }
 
   Future<void> fetchUserDetails() async {
@@ -81,64 +97,110 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           size: 50.0,
         ),
       )
-          : SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 60,
-                  backgroundImage: NetworkImage(profileUrl),
-                  backgroundColor: Colors.purple[700],
+          : _token == null
+          ? _buildLoginPrompt()
+          : _buildProfileContent(),
+    );
+  }
+
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Please log in to view your profile',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 20),
+          ElevatedButton(
+            child: Text(
+              'Log In / Sign Up',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => LoginScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileContent() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 60,
+                backgroundImage: NetworkImage(profileUrl),
+                backgroundColor: Colors.purple[700],
+              ),
+              SizedBox(height: 20),
+              Text(
+                name,
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-                SizedBox(height: 20),
-                Text(
-                  name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                email,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: Colors.grey[400],
                 ),
-                SizedBox(height: 10),
-                Text(
-                  email,
+              ),
+              SizedBox(height: 30),
+              _buildInfoCard('My Creations', '4', Icons.music_note),
+              SizedBox(height: 16),
+              _buildInfoCard('Liked Songs', '0', Icons.favorite),
+              SizedBox(height: 40),
+              ElevatedButton(
+                child: Text(
+                  'Logout',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
-                    color: Colors.grey[400],
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 30),
-                _buildInfoCard('My Creations', '4', Icons.music_note),
-                SizedBox(height: 16),
-                _buildInfoCard('Liked Songs', '0', Icons.favorite),
-                SizedBox(height: 40),
-                ElevatedButton(
-                  child: Text(
-                    'Logout',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  onPressed: () async {
-                    await ApiService.logout();
-                    Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => LoginScreen()));
-                  },
                 ),
-              ],
-            ),
+                onPressed: () async {
+                  await ApiService.logout();
+                  Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => LoginScreen()));
+                },
+              ),
+            ],
           ),
         ),
       ),

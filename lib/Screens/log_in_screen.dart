@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import '../API/API.dart';
+import 'sign_up_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -61,6 +62,11 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => HomeScreen()),
     );
+  }
+
+  void _skip() {
+    // Navigate to home screen without logging in
+    _navigateToHome();
   }
 
   @override
@@ -139,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading
                       ? CircularProgressIndicator(color: Colors.white)
-                      : Text('Login', style: GoogleFonts.poppins(fontSize: 16,color: Colors.white)),
+                      : Text('Login', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     padding: EdgeInsets.symmetric(vertical: 16),
@@ -149,15 +155,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _googleLogin,
-                  icon: FaIcon(FontAwesomeIcons.google, color: Colors.white),
-                  label: Text('Login with Google', style: GoogleFonts.poppins(fontSize: 16,color: Colors.white,) ),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _navigateSignUp,
+                  child: Text('SignUp', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: Colors.purple,
                     padding: EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 24),
+                TextButton(
+                  onPressed: _skip,
+                  child: Text(
+                    'Skip',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.purple[300],
+
                     ),
                   ),
                 ),
@@ -165,7 +182,13 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+
       ),
+    );
+  }
+  void _navigateSignUp() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => SignUpScreen()),
     );
   }
 }

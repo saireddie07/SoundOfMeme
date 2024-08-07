@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'my_creations_screen.dart';
 import 'liked_songs_screen.dart';
 import 'profile_screen.dart';
+import 'create_screen.dart';
 import 'discover_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-
 
 class HomeScreen extends StatelessWidget {
   @override
@@ -17,6 +16,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -27,6 +27,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _children = [
     DiscoverScreen(),
     MyCreationsScreen(),
+    CreateScreen(),
     LikedSongsScreen(),
     ProfileScreen(),
   ];
@@ -63,45 +64,40 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       body: _children[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          onTap: onTabTapped,
-          currentIndex: _currentIndex,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.black,
-          selectedItemColor: Colors.purple,
-          unselectedItemColor: Colors.grey,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          unselectedLabelStyle: GoogleFonts.poppins(),
-          items: [
-            _buildNavItem(Icons.home, 'Discover'),
-            _buildNavItem(Icons.music_note, 'My Creations'),
-            _buildNavItem(Icons.favorite, 'Liked Songs'),
-            _buildNavItem(Icons.person, 'Profile'),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        onTap: onTabTapped,
+        currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.purple,
+        unselectedItemColor: Colors.grey,
+        selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12),
+        unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12),
+        items: [
+          _buildNavItem(Icons.home, 'Discover'),
+          _buildNavItem(Icons.music_note, 'My Creations'),
+          _buildNavItem(Icons.add_circle, 'Create', isSpecial: true),
+          _buildNavItem(Icons.favorite, 'Liked Songs'),
+          _buildNavItem(Icons.person, 'Profile'),
+        ],
       ),
     );
   }
 
-  BottomNavigationBarItem _buildNavItem(IconData icon, String label) {
+  BottomNavigationBarItem _buildNavItem(IconData icon, String label, {bool isSpecial = false}) {
     return BottomNavigationBarItem(
-      icon: Icon(icon),
+      icon: Icon(
+        icon,
+        color: isSpecial ? Colors.purple : null,
+        size: isSpecial ? 40 : 24,
+      ),
       activeIcon: Container(
         padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: Colors.purple.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon),
+        child: Icon(icon, color: Colors.purple),
       ),
       label: label,
     );
@@ -134,5 +130,3 @@ class CustomLogo extends StatelessWidget {
     );
   }
 }
-
-// Include your LoginScreen here or in a separate file
